@@ -1,8 +1,17 @@
-# BloxOne DDI Sync
+
+========================
+BloxOne DDI Sync
+========================
+Author: Stefan Braitti
+
+About
+-----------
 Script to compare and synchronize Infoblox BloxOne DDI records to other DNS using DNS Transfer
 This tool is experimental.
 
-# About
+
+Description
+-----------
 The idea behind this tools is to get zonetransfer from two NameServers, compare it based on record types and make changes in the BloxOneDDI to synchronize it. 
 Feel free to contribute! I'm not a developer..
 
@@ -37,3 +46,28 @@ optional arguments:
                         Path to ini file with API key
   --logfile LOGFILE     Log file name (Default: logfile.log)
   -v, --version         show program's version number and exit</pre>
+  
+  Prerequisites
+-------------
+
+Python 3.6 or above
+
+Non-standard modules:
+
+    - bloxone 0.5.6+
+
+The latest version of the bloxone module is available on PyPI and can simply be
+installed using::
+
+    pip3 install bloxone --user
+
+To upgrade to the latest version::
+
+    pip3 install bloxone --user --upgrade
+
+Complete list of modules::
+    import dns.resolver
+    import dns.zone
+    import bloxone, 
+    import logging
+    import json
