@@ -1,19 +1,20 @@
 
 # BloxOne DDI Sync
 
-
 Version 0.1
 Author: Stefan Braitti
 
 About
 -----------
 Script to compare and synchronize Infoblox BloxOne DDI records to other DNS using DNS Transfer
+
 This tool is experimental.
 
 
 Description
 -----------
 The idea behind this tools is to get zonetransfer from two NameServers, compare it based on record types and make changes in the BloxOneDDI to synchronize it. 
+
 Feel free to contribute! I'm not a developer..
 
 # Thanks
