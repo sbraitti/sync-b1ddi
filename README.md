@@ -10,6 +10,7 @@ Feel free to contribute! I'm not a developer..
 Special thanks to John Neerdael and Chris Marrison for their contribution to the community =) 
 
 # Usage
+<pre>
 usage: b1ddi-sync.py [-h] -z ZONE --source SERVER1 --dest SERVER2 [-a] [-t]
                      [-m] [--aaaa] [--cname] [--tags TAGS] --view VIEWNAME
                      [--debug] [--ignore-ttl] [--stop-on-error] -c CONFIG
@@ -35,4 +36,4 @@ optional arguments:
   -c CONFIG, --config CONFIG
                         Path to ini file with API key
   --logfile LOGFILE     Log file name (Default: logfile.log)
-  -v, --version         show program's version number and exit
+  -v, --version         show program's version number and exit</pre>
