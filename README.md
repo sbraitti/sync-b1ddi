@@ -1,7 +1,8 @@
 
-========================
-BloxOne DDI Sync
-========================
+# BloxOne DDI Sync
+
+
+Version 0.1
 Author: Stefan Braitti
 
 About
