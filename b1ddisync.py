@@ -16,6 +16,7 @@ import dns.reversename
 import dns.zone
 import dns.exception
 import bloxone, argparse, logging, json
+import signal
 
 def getzone(ns, zone):
     records = []
@@ -85,11 +86,11 @@ def sync_arecord(source, dest):
     # Remove different records from source
     for record in dest:
         if record not in source and record['type'] == 1:
+            show("Removing A record " + record['name'] + " from B1DDI")
             # Get Record ID
             response = b1ddi.get('/dns/record', _filter="(name_in_zone=='" + record['name'] + "') and (zone=='"+zoneid+"') and (dns_rdata=='" + record['rdata'] + "')")
             if response.status_code in b1ddi.return_codes_ok and len(response.json()['results']):
                 recordid = response.json()['results'][0]['id'].split('/')[2]
-                show("Removing A record " + record['name'] + " from B1DDI - RecordID:" + recordid)
                 response = b1ddi.delete('/dns/record', id=recordid)
                 if response.status_code in b1ddi.return_codes_ok:
                     show("Success!")
@@ -102,7 +103,10 @@ def sync_arecord(source, dest):
     # Add records that are present in source
     for record in source:
         if record not in dest and record['type'] == 1:
-            fqdn = record['name'] + '.' + options.zone
+            if record['name'] == '@':
+                fqdn = options.zone
+            else:
+                fqdn = record['name'] + '.' + options.zone
             address = record['rdata']
             comment = ''
             # Copy TTL
@@ -112,8 +116,7 @@ def sync_arecord(source, dest):
                 jsonTTL = ''
 
             body = ('{"view":"' + view + '","absolute_name_spec":"' + fqdn + '","rdata":{"address":"' + address + '"},"comment":"' + comment + '","type":"A", ' + jsonTTL + jsonTags + '}')  # Create body for network creation
-            jsonBody = json.loads(
-                json.dumps(body))  # Convert body to correct JSON and ensure quotes " are not escaped (ex. \")
+            jsonBody = json.loads(json.dumps(body))  # Convert body to correct JSON and ensure quotes " are not escaped (ex. \")
             show("Creating A record on B1DDI: " + fqdn)
             response = b1ddi.create('/dns/record', body=jsonBody)  # Creating record
             if response.status_code in b1ddi.return_codes_ok:
@@ -161,7 +164,10 @@ def sync_aaaarecord(source, dest):
     # Add records that are present in source
     for record in source:
         if record not in dest and record['type'] == 28:
-            fqdn = record['name'] + '.' + options.zone
+            if record['name'] == '@':
+                fqdn = options.zone
+            else:
+                fqdn = record['name'] + '.' + options.zone
             address = record['rdata']
             comment = ''
             # Copy TTL
@@ -287,7 +293,10 @@ def sync_mxrecord(source, dest):
     # Add records that are present in source
     for record in source:
         if record not in dest and record['type'] == 15:
-            fqdn = record['name'] + '.' + options.zone
+            if record['name'] == '@':
+                fqdn = options.zone
+            else:
+                fqdn = record['name'] + '.' + options.zone
             preference = record['rdata'].split(' ')[0]
             exchange = record['rdata'].split(' ')[1]
             comment = ''
@@ -347,7 +356,10 @@ def sync_txtrecord(source, dest):
     # Add records that are present in source
     for record in source:
         if record not in dest and record['type'] == 16:
-            fqdn = record['name'] + '.' + options.zone
+            if record['name'] == '@':
+                fqdn = options.zone
+            else:
+                fqdn = record['name'] + '.' + options.zone
             text = record['rdata']
             comment = ''
             # Copy TTL
@@ -370,19 +382,85 @@ def sync_txtrecord(source, dest):
                 if options.stoponerror:
                     exit("ERROR FOUND, QUITING!")
 
+#Function to sync MX records
+def sync_srvrecord(source, dest):
+    show("Syncing SRV Records")
+    # Get View ID
+    view = b1ddi.get_id('/dns/view', key="name",value=options.viewname, include_path=True)
+
+    # Get zone ID
+    filter = ( '(fqdn=="'+options.zone+'.")and(view=="' + view + '")' )
+    zone  = b1ddi.get('/dns/auth_zone', _filter=filter, _fields="fqdn,id")
+    if zone.status_code in b1ddi.return_codes_ok:
+        zoneid = zone.json()['results'][0]['id']
+    else:
+        show("Zone not found")
+        logger.error("Zone " + options.zone + " not found")
+        exit()
+
+    # Remove different records from source
+    for record in dest:
+        if record not in source and record['type'] == 33:
+            show("Removing SRV record " + record['name'] + " from B1DDI")
+            # Fix records which are not ending in dot
+            if not record['rdata'].endswith('.'):
+                record['rdata'] = record['rdata']+'.'+options.zone+'.'
+            # Get Record ID
+            filter = "(name_in_zone=='" + record['name'] + "') and (zone=='"+zoneid+"') and (dns_rdata=='" + record['rdata'] + "')"
+            response = b1ddi.get('/dns/record', _filter=filter)
+            if response.status_code in b1ddi.return_codes_ok and len(response.json()['results']):
+                recordid = response.json()['results'][0]['id'].split('/')[2]
+                response = b1ddi.delete('/dns/record', id=recordid)
+                if response.status_code in b1ddi.return_codes_ok:
+                    show("Success!")
+                else:  
+                    show("Failed!")
+                    logger.error("Error removing SRV record: " + record['name'])
+            else:
+                show("Record not found")
+                logger.error(response.status_code)
+                logger.error(response.text)
+    #Add records that are present in source
+    for record in source:
+        if record not in dest and record['type'] == 33:
+            fqdn = record['name'] + '.' + options.zone
+            priority = record['rdata'].split(' ')[0]
+            weight = record['rdata'].split(' ')[1]
+            port = record['rdata'].split(' ')[2]
+            target = record['rdata'].split(' ')[3]
+            comment = ''
+            # Copy TTL
+            if not options.ignorettl:
+                jsonTTL = '"inheritance_sources":{"ttl":{"action":"override"}}, "ttl": ' + str(record['ttl']) + ','
+            else:
+                jsonTTL = ''
+            body = ('{"view":"' + view + '","absolute_name_spec":"' + fqdn + '","rdata":{"port":' + port + ',"priority":' + priority + ',"target":"' + target + '","weight":' + weight +'},"comment":"' + comment + '","type":"SRV",' + jsonTTL + jsonTags + '}')  # Create body for network creation
+            jsonBody = json.loads(json.dumps(body))  # Convert body to correct JSON and ensure quotes " are not escaped (ex. \")
+            show("Creating SRV record on B1DDI: " + fqdn)
+            response = b1ddi.create('/dns/record', body=jsonBody)  # Creating record
+            if response.status_code in b1ddi.return_codes_ok:
+                show("Success!")
+            else:
+                show("Error, please check the logs!")
+                logger.error(jsonBody)
+                logger.error(str(response.status_code) + " " + response.text)
+                if options.stoponerror:
+                    exit("ERROR FOUND, QUITING!")
 
     
 def checksvc(list1, list2):
-    if options.arecord:
+    if options.arecord or options.allrecords:
         sync_arecord(list1, list2)
-    if options.aaaarecord:
+    if options.aaaarecord or options.allrecords:
         sync_aaaarecord(list1, list2)
-    if options.cnamerecord:
+    if options.cnamerecord or options.allrecords:
         sync_cnamerecord(list1, list2)
-    if options.txtrecord:
+    if options.txtrecord or options.allrecords:
         sync_txtrecord(list1, list2)
-    if options.mxrecord:
+    if options.mxrecord or options.allrecords:
         sync_mxrecord(list1, list2)
+    if options.srvrecord or options.allrecords:
+        sync_srvrecord(list1, list2)
 
 
 def getzones():
@@ -402,6 +480,8 @@ def cliparser():
     parser.add_argument('-m', '--mxrecord', action="store_true", dest="mxrecord", help="Parse MX record data")
     parser.add_argument('--aaaa', action="store_true", dest="aaaarecord", help="Sync AAAA record data")
     parser.add_argument('--cname', action="store_true", dest="cnamerecord", help="Sync CNAME record data")
+    parser.add_argument('--srv', action="store_true", dest="srvrecord", help="Sync SRV record data")
+    parser.add_argument('--all', action="store_true", dest="allrecords", help="Sync ALL records in the script")
     parser.add_argument('--tags', action="store", dest="tags", help="Tags to apply to imported objects")
     parser.add_argument('--view', action="store", dest="viewname", help="View name", required=True)
     parser.add_argument('--debug', action="store_true", dest="debug", help="Log debug")
@@ -417,5 +497,23 @@ def show(msg):
     print("[INFO] "+msg)
     logger.info(msg)
 
+def exit_gracefully(signum, frame):
+    # restore the original signal handler as otherwise evil things will happen
+    # in raw_input when CTRL+C is pressed, and our signal handler is not re-entrant
+    signal.signal(signal.SIGINT, original_sigint)
+
+    try:
+        if input("\nReally quit? (y/n)> ").lower().startswith('y'):
+            logger.info("Stopped by user")
+            exit("Quitting")
+
+    except KeyboardInterrupt:
+        logger.info("Stopped by user")
+        exit("Ok ok, quitting")
+
+    # restore the exit gracefully handler here    
+    signal.signal(signal.SIGINT, exit_gracefully)
 if __name__ == '__main__':
+    original_sigint = signal.getsignal(signal.SIGINT)
+    signal.signal(signal.SIGINT, exit_gracefully)
     main()
