@@ -26,7 +26,7 @@ def getzone(ns, zone):
 
     for item in z.iterate_rdatas():
         # Ignore transfer from another zones
-        if options.zoneonly and item[0].to_text().endswith(options.zone+"."): continue
+        if options.zoneonly and not item[0].to_text().endswith(options.zone+"."): continue
         # Append record to dict
         record = {"name": item[0].to_text(), "ttl": item[1], "type": item[2].rdtype, "rdata": item[2].to_text().replace('"','')}
         records.append(record)
