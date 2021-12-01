@@ -20,9 +20,14 @@ import signal
 
 def getzone(ns, zone):
     records = []
+    show("Transfering zone from NS " + str(ns))
+    if options.zoneonly: show("Ignoring records without zone domain name")
     z = dns.zone.from_xfr(dns.query.xfr(ns, zone))
 
     for item in z.iterate_rdatas():
+        # Ignore transfer from another zones
+        if options.zoneonly and item[0].to_text().endswith(options.zone+"."): continue
+        # Append record to dict
         record = {"name": item[0].to_text(), "ttl": item[1], "type": item[2].rdtype, "rdata": item[2].to_text().replace('"','')}
         records.append(record)
     return records
@@ -486,6 +491,7 @@ def cliparser():
     parser.add_argument('--view', action="store", dest="viewname", help="View name", required=True)
     parser.add_argument('--debug', action="store_true", dest="debug", help="Log debug")
     parser.add_argument('--ignore-ttl', action="store_true", dest="ignorettl", help="Ignore TTL")
+    parser.add_argument('--zone-only', action="store_true", dest="zoneonly", help="Check if record ends with zone domain name")
     parser.add_argument('--stop-on-error', action="store_true", dest="stoponerror", help="Quit script on error")
     parser.add_argument('-c', '--config', action="store", dest="config", help="Path to ini file with API key", required=True)
     parser.add_argument('--logfile', action="store", dest="logfile", help="Log file name (Default: logfile.log)", default="logfile.log")
